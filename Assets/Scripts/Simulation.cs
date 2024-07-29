@@ -20,6 +20,7 @@ public class Simulation : MonoBehaviour {
     [SerializeField] private uint boidAmount;
     [SerializeField] private float boidSpeed;
     [SerializeField] private float avoidFactor;
+    [SerializeField] private float inertFactor;
 
     [Header("Boid Detection")]
     [SerializeField] private float boidVisionRadius;
@@ -45,7 +46,6 @@ public class Simulation : MonoBehaviour {
         for (uint i = 0; i < boidAmount; i++) {
             boidObjects[i] = Instantiate(boidObject, GetRandomPosition(), Quaternion.identity);
             PaintBoid(i, new Color(.4f, .4f, 1f));
-            if (i == 5) PaintBoid(i, new Color(1f, 0f, 0f));
 
             boidVelocities[i] = GetRandomDirection() * boidSpeed;
             boidPositions[i] = GetRandomPosition();
@@ -57,6 +57,7 @@ public class Simulation : MonoBehaviour {
             boidAccelerations[i] = Separation(i);
 
             boidVelocities[i] += boidAccelerations[i] * Time.fixedDeltaTime;
+            boidVelocities[i] = SmoothVelocity(boidVelocities[i]);
 
             boidPositions[i] += boidVelocities[i] * Time.fixedDeltaTime;
             boidPositions[i] = GetBoundCollision(boidPositions[i]);
@@ -66,7 +67,7 @@ public class Simulation : MonoBehaviour {
     }
 
     private Vector3 Separation(uint boidIndex) {
-        Vector3 accelerationAway = Vector3.zero;
+        Vector3 dirAway = Vector3.zero;
 
         for (uint i = 0; i < boidAmount; i++) {
             Vector3 boidVector = boidPositions[boidIndex] - boidPositions[i];
@@ -74,10 +75,16 @@ public class Simulation : MonoBehaviour {
             if (boidVector.sqrMagnitude > Math.Pow(boidVisionRadius, 2)) continue;
             if (i == boidIndex) continue;
             
-            accelerationAway += boidVector;
+            dirAway += boidVector;
         }
 
-        return accelerationAway.normalized * avoidFactor;
+        return dirAway.normalized * avoidFactor;
+    }
+
+    private Vector3 SmoothVelocity(Vector3 boidVel) {
+        if (boidVel.sqrMagnitude > Math.Pow(boidSpeed, 2)) return boidVel - inertFactor * Time.fixedDeltaTime * boidVel.normalized;
+
+        return boidVel.normalized * boidSpeed;
     }
 
     private Vector3 GetBoundCollision(Vector3 boidPos) {        

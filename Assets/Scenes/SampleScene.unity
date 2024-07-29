@@ -455,9 +455,10 @@ MonoBehaviour:
   boidObject: {fileID: 3077808548466831242, guid: cc513d61e328f8545909f8c2223f91b1,
     type: 3}
   boidAmount: 80
-  boidSpeed: 1
-  avoidFactor: 1
-  boidVisionRadius: 6
+  boidSpeed: 3
+  avoidFactor: 6
+  inertFactor: 4
+  boidVisionRadius: 3
   boidAngle: 0
 --- !u!4 &2074367059
 Transform:
