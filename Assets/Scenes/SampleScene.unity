@@ -206,7 +206,7 @@ Transform:
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -16}
+  m_LocalPosition: {x: 0, y: 0, z: -22.56}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -451,13 +451,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b829a1a07b35eba48828b2027b3e3395, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  boxBounds: {x: 20, y: 10, z: 10}
+  boxBounds: {x: 30, y: 15, z: 15}
   boidObject: {fileID: 3077808548466831242, guid: cc513d61e328f8545909f8c2223f91b1,
     type: 3}
   boidAmount: 80
-  boidSpeed: 3
-  avoidFactor: 6
-  inertFactor: 4
+  boidSpeed: 4.5
+  coherenceFactor: 4
+  avoidFactor: 3
+  alignFactor: 3
+  inertFactor: 3
   boidVisionRadius: 3
   boidAngle: 0
 --- !u!4 &2074367059

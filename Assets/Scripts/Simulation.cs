@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
 using Unity.VisualScripting;
@@ -9,6 +10,8 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
 using Random = UnityEngine.Random;
+using Quaternion = UnityEngine.Quaternion;
+using Vector3 = UnityEngine.Vector3;
 
 public class Simulation : MonoBehaviour {
     
@@ -16,10 +19,14 @@ public class Simulation : MonoBehaviour {
 
     [SerializeField] private GameObject boidObject;
 
-    [Header("Boid Movement")]
+    [Header("Boid General")]
     [SerializeField] private uint boidAmount;
     [SerializeField] private float boidSpeed;
+
+    [Header("Boid Behaviours")]
+    [SerializeField] private float coherenceFactor;
     [SerializeField] private float avoidFactor;
+    [SerializeField] private float alignFactor;
     [SerializeField] private float inertFactor;
 
     [Header("Boid Detection")]
@@ -44,17 +51,19 @@ public class Simulation : MonoBehaviour {
         boidPositions = new Vector3[boidAmount];       
 
         for (uint i = 0; i < boidAmount; i++) {
-            boidObjects[i] = Instantiate(boidObject, GetRandomPosition(), Quaternion.identity);
-            PaintBoid(i, new Color(.4f, .4f, 1f));
+            Vector3 startPosition = GetRandomPosition();
 
+            boidObjects[i] = Instantiate(boidObject, startPosition, Quaternion.identity);
             boidVelocities[i] = GetRandomDirection() * boidSpeed;
-            boidPositions[i] = GetRandomPosition();
+            boidPositions[i] = startPosition;
+
+            PaintBoid(i, new Color(.4f, .4f, 1f));
         }
     }
 
     private void FixedUpdate() {
         for (uint i = 0; i < boidAmount; i++) {
-            boidAccelerations[i] = Separation(i);
+            boidAccelerations[i] = CalculateAcceleration(i);
 
             boidVelocities[i] += boidAccelerations[i] * Time.fixedDeltaTime;
             boidVelocities[i] = SmoothVelocity(boidVelocities[i]);
@@ -66,19 +75,38 @@ public class Simulation : MonoBehaviour {
         }
     }
 
-    private Vector3 Separation(uint boidIndex) {
-        Vector3 dirAway = Vector3.zero;
+    private Vector3 CalculateAcceleration(uint boidIndex) {
+        Vector3 totalVelocityAway = Vector3.zero;
+        Vector3 totalVelocity = Vector3.zero;
+        Vector3 totalPosition = Vector3.zero;
+
+        uint closeBoidsAmount = 0;
 
         for (uint i = 0; i < boidAmount; i++) {
+            
+            // Check distance from another boids and calculate factors if the distance is less than the boid vision radius.
             Vector3 boidVector = boidPositions[boidIndex] - boidPositions[i];
             
-            if (boidVector.sqrMagnitude > Math.Pow(boidVisionRadius, 2)) continue;
-            if (i == boidIndex) continue;
+            if (boidVector.sqrMagnitude > Math.Pow(boidVisionRadius, 2) || i == boidIndex) continue;
             
-            dirAway += boidVector;
+            // Calculate factors: 
+            // Coherence - Boid fly towards other boids.
+            // Alignment - Boid tries to match its speed and direction with nearby boids.
+            // Separation - Boid avoid running into other.
+
+            totalPosition += boidPositions[i];
+            totalVelocity += boidVelocities[i];
+
+            totalVelocityAway += boidVector.normalized * (boidVisionRadius / boidVector.magnitude);
+
+            closeBoidsAmount++;
         }
 
-        return dirAway.normalized * avoidFactor;
+        Vector3 centerMassDir = ((totalPosition +  boidPositions[boidIndex]) / (closeBoidsAmount + 1)) - boidPositions[boidIndex];
+        Vector3 alignVelocity = ((totalVelocity + boidVelocities[boidIndex]) / (closeBoidsAmount + 1)) - boidVelocities[boidIndex];
+        Vector3 awayVelocity = closeBoidsAmount != 0 ? totalVelocityAway / closeBoidsAmount : Vector3.zero;
+
+        return awayVelocity * avoidFactor + centerMassDir.normalized * coherenceFactor + alignVelocity.normalized * alignFactor;
     }
 
     private Vector3 SmoothVelocity(Vector3 boidVel) {
