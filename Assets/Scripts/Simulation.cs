@@ -12,6 +12,8 @@ using UnityEngine.UIElements;
 using Random = UnityEngine.Random;
 using Quaternion = UnityEngine.Quaternion;
 using Vector3 = UnityEngine.Vector3;
+using Debug = UnityEngine.Debug;
+using Unity.VisualScripting.Dependencies.NCalc;
 
 public class Simulation : MonoBehaviour {
     
@@ -30,8 +32,8 @@ public class Simulation : MonoBehaviour {
     [SerializeField] private float inertFactor;
 
     [Header("Boid Detection")]
+    [SerializeField] [Range(0f, 180f)] private float boidAngle;
     [SerializeField] private float boidVisionRadius;
-    [SerializeField] private float boidAngle;
 
     Vector3[] boidPositions;
     Vector3[] boidVelocities;
@@ -87,7 +89,9 @@ public class Simulation : MonoBehaviour {
             // Check distance from another boids and calculate factors if the distance is less than the boid vision radius.
             Vector3 boidVector = boidPositions[boidIndex] - boidPositions[i];
             
-            if (boidVector.sqrMagnitude > Math.Pow(boidVisionRadius, 2) || i == boidIndex) continue;
+            if (boidVector.sqrMagnitude > Math.Pow(boidVisionRadius, 2) || 
+                Math.Abs(Vector3.Angle(boidVelocities[boidIndex], -boidVector)) > boidAngle ||
+                i == boidIndex) continue;
             
             // Calculate factors: 
             // Coherence - Boid fly towards other boids.
@@ -97,14 +101,16 @@ public class Simulation : MonoBehaviour {
             totalPosition += boidPositions[i];
             totalVelocity += boidVelocities[i];
 
-            totalVelocityAway += boidVector.normalized * (boidVisionRadius / boidVector.magnitude);
+            totalVelocityAway += boidVector.normalized * (boidVector.magnitude > 0 ? (boidVisionRadius / boidVector.magnitude) : avoidFactor * boidSpeed);
 
             closeBoidsAmount++;
         }
 
+        if (closeBoidsAmount == 0) return Vector3.zero;
+
         Vector3 centerMassDir = ((totalPosition +  boidPositions[boidIndex]) / (closeBoidsAmount + 1)) - boidPositions[boidIndex];
         Vector3 alignVelocity = ((totalVelocity + boidVelocities[boidIndex]) / (closeBoidsAmount + 1)) - boidVelocities[boidIndex];
-        Vector3 awayVelocity = closeBoidsAmount != 0 ? totalVelocityAway / closeBoidsAmount : Vector3.zero;
+        Vector3 awayVelocity = totalVelocityAway / closeBoidsAmount;
 
         return awayVelocity * avoidFactor + centerMassDir.normalized * coherenceFactor + alignVelocity.normalized * alignFactor;
     }

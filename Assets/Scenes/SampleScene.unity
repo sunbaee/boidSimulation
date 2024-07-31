@@ -456,12 +456,12 @@ MonoBehaviour:
     type: 3}
   boidAmount: 80
   boidSpeed: 4.5
-  coherenceFactor: 4
-  avoidFactor: 3
+  coherenceFactor: 4.5
+  avoidFactor: 2.5
   alignFactor: 3
   inertFactor: 3
+  boidAngle: 135
   boidVisionRadius: 3
-  boidAngle: 0
 --- !u!4 &2074367059
 Transform:
   m_ObjectHideFlags: 0
