@@ -15,12 +15,15 @@ using Vector3 = UnityEngine.Vector3;
 using Debug = UnityEngine.Debug;
 using Unity.VisualScripting.Dependencies.NCalc;
 using System.Linq;
+using TMPro;
 
 public class Simulation : MonoBehaviour {
     
-    [SerializeField] Vector3 boxBounds;
-
     [SerializeField] private GameObject boidObject;
+
+    [Header("Bound Configuration")]
+    [SerializeField] Vector3 boxBounds;
+    [SerializeField] float boxThickness;
 
     [Header("Boid General")]
     [SerializeField] private uint boidAmount;
@@ -31,6 +34,7 @@ public class Simulation : MonoBehaviour {
     [SerializeField] private float avoidFactor;
     [SerializeField] private float alignFactor;
     [SerializeField] private float inertFactor;
+    [SerializeField] private float collisionDeviation;
 
     [Header("Boid Detection")]
     [SerializeField] [Range(0f, 180f)] private float boidAngle;
@@ -41,28 +45,25 @@ public class Simulation : MonoBehaviour {
     // [SerializeField] private float sphereRadius = 10f;
     // [SerializeField] [Range(0f, (float) Math.PI * 2)] private float angle = 2.399963f;
 
+    GameObject[] boidObjects;
+
+    // boid vectors.
     Vector3[] boidPositions;
     Vector3[] boidVelocities;
     Vector3[] boidAccelerations;
 
-    GameObject[] boidObjects;
+    // Vector for boxThickness float.
+    Vector3 boxThicknessVector;
 
+    // points in a sphere surface.
     Vector3[] spherePoints;
 
-    Vector3 showRay;
-
+    // Golden angle to create uniform points in a sphere surface.
     readonly float GOLDEN_ANGLE = Mathf.PI * (3 - Mathf.Sqrt(5));
 
     private void OnDrawGizmos() {
+        Gizmos.color = new Color(.45f, .45f, 1f);
         Gizmos.DrawWireCube(Vector3.zero, boxBounds);
-        if (boidPositions == null || boidPositions.Length == 0) return;
-        
-        Gizmos.DrawLine(boidPositions[0], showRay);
-        // if (spherePoints == null) return;
-
-        // for (int i = 0; i < spherePoints.Length; i++) {
-        //     Gizmos.DrawSphere(spherePoints[i], 0.1f);
-        // }
     }
     
     private void Awake() {
@@ -72,10 +73,11 @@ public class Simulation : MonoBehaviour {
         boidVelocities = new Vector3[boidAmount];
         boidPositions = new Vector3[boidAmount];       
 
-        spherePoints = SpherePoints(200, boidVisionRadius, GOLDEN_ANGLE);
+        boxThicknessVector = new(boxThickness, boxThickness, boxThickness);
+        spherePoints = SpherePoints(100, boidVisionRadius, GOLDEN_ANGLE);
 
         for (uint i = 0; i < boidAmount; i++) {
-            Vector3 startPosition = GetRandomPosition();
+            Vector3 startPosition = GetRandomPosition(boxBounds - boxThicknessVector);
 
             boidObjects[i] = Instantiate(boidObject, startPosition, Quaternion.identity);
             boidVelocities[i] = GetRandomDirection() * boidSpeed;
@@ -130,7 +132,7 @@ public class Simulation : MonoBehaviour {
         }
 
         // Checks for collisions:
-        Vector3 deviationAcceleration = Mathf.Pow(avoidFactor, 3) * GetBoundCollision(boidPositions[boidIndex], boidVelocities[boidIndex]);
+        Vector3 deviationAcceleration = collisionDeviation * GetCollisions(boidPositions[boidIndex], boidVelocities[boidIndex]);
 
         // If theres no nearby boids, skip other calculations.
         if (closeBoidsAmount == 0) return deviationAcceleration;
@@ -163,7 +165,6 @@ public class Simulation : MonoBehaviour {
 
             // Converts the sphere to its normal size
             points[i] = basePoint * sphereRadius;
-            
         }
 
         return points;
@@ -176,35 +177,53 @@ public class Simulation : MonoBehaviour {
         return boidVel.normalized * boidSpeed;
     }
 
-    private Vector3 GetBoundCollision(Vector3 boidPos, Vector3 boidVelocity) {
-        // Adjusts ray off-set with the direction of the boid.
-
-        Vector3 offSetDir = boidVelocity.normalized - Vector3.forward;
-        Vector3 rayOffSet = offSetDir * boidVisionRadius;
-
+    private Vector3 GetCollisions(Vector3 boidPos, Vector3 boidVelocity) {
+        // Adjusts sphere points with the direction of the boid (base sphere points towards z = 1f).
+        Quaternion offSetRotation = Quaternion.FromToRotation(Vector3.forward, boidVelocity);
+        
+        // Loops through predefined points around a sphere, the center of the sphere is the boid.
         for (int i = 0; i < spherePoints.Length; i++) {
-            // Vector from the boid to a point in the surface of a sphere.
-            Vector3 castVector = spherePoints[i] + rayOffSet;
-            showRay = boidPos + boidVelocity;
-
-            // Looks for clear direction if it collided.
-            if (Physics.Raycast(boidPos, castVector.normalized, boidVisionRadius)) continue;
+            // Vector from the boid to a sphere point.
+            Vector3 castVector = offSetRotation * spherePoints[i];
+            
+            // Looks for clear direction if it collided with an object or the bound box.
+            if (Physics.Raycast(boidPos, castVector.normalized, boidVisionRadius) || CheckBounds(boidPos + castVector, boxBounds - boxThicknessVector)) continue;
             
             // If a clear direction is found, creates acceleration to the clear direction.
             if (i > 0) return (castVector - boidVelocity).normalized;
             
+            // Returns no acceleration if it didn't collide.
             return Vector3.zero;
         }
 
         return Vector3.zero;
     }
     
-    private Vector3 GetRandomPosition() {
+    private bool CheckBounds(Vector3 pos, Vector3 boundPos) {
+        // Compares if any component of pos is bigger than the corresponding component of boundPos.
+        // Also compares if pos is smaller than -boundPos.
+
+        // Divides bound by 2 to correspond with center of bound box.
+        Vector3 halfBound = boundPos / 2f;
+
+        float[] posArray = { pos.x, pos.y, pos.z },
+                boundArray = { halfBound.x, halfBound.y, halfBound.z };
+        
+        // Loops through all pos components and compares them with all halfBound components, returns true if any comparation is true.
+        for (int i = 0; i < 3; i++) {
+            if (posArray[i] > boundArray[i] || posArray[i] < -boundArray[i]) return true;
+        }
+
+        // Returns false otherwise.
+        return false;
+    }
+
+    private Vector3 GetRandomPosition(Vector3 boundPos) {
         // Creates a random position inside the bound box.
 
-        float xValue = Random.Range(-boxBounds.x / 2f, boxBounds.x / 2f),
-              yValue = Random.Range(-boxBounds.y / 2f, boxBounds.y / 2f),
-              zValue = Random.Range(-boxBounds.z / 2f, boxBounds.z / 2f);
+        float xValue = Random.Range(-boundPos.x / 2f, boundPos.x / 2f),
+              yValue = Random.Range(-boundPos.y / 2f, boundPos.y / 2f),
+              zValue = Random.Range(-boundPos.z / 2f, boundPos.z / 2f);
 
         return new Vector3(xValue, yValue, zValue);
     }
