@@ -205,13 +205,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -22.56}
+  m_LocalRotation: {x: 0.20082727, y: -0.2531632, z: 0.053811498, w: 0.944818}
+  m_LocalPosition: {x: 11.54, y: 10, z: -20}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 24, y: -30, z: 0}
 --- !u!114 &330585547
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -451,17 +451,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b829a1a07b35eba48828b2027b3e3395, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  boxBounds: {x: 30, y: 15, z: 15}
+  boxBounds: {x: 0, y: 0, z: 0}
   boidObject: {fileID: 3077808548466831242, guid: cc513d61e328f8545909f8c2223f91b1,
     type: 3}
-  boidAmount: 80
+  boidAmount: 0
   boidSpeed: 4.5
   coherenceFactor: 4.5
   avoidFactor: 2.5
   alignFactor: 3
   inertFactor: 3
   boidAngle: 135
+  rayCastStepAngle: 0
   boidVisionRadius: 3
+  numPoints: 0
+  sphereRadius: 0
+  angle: 0
 --- !u!4 &2074367059
 Transform:
   m_ObjectHideFlags: 0

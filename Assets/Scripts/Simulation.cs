@@ -14,6 +14,7 @@ using Quaternion = UnityEngine.Quaternion;
 using Vector3 = UnityEngine.Vector3;
 using Debug = UnityEngine.Debug;
 using Unity.VisualScripting.Dependencies.NCalc;
+using System.Linq;
 
 public class Simulation : MonoBehaviour {
     
@@ -33,7 +34,13 @@ public class Simulation : MonoBehaviour {
 
     [Header("Boid Detection")]
     [SerializeField] [Range(0f, 180f)] private float boidAngle;
+    [SerializeField] private float rayCastStepAngle;
     [SerializeField] private float boidVisionRadius;
+
+    [Header("Sphere")]
+    [SerializeField] private uint numPoints;
+    [SerializeField] private float sphereRadius = 10f;
+    [SerializeField] [Range(0f, (float) Math.PI * 2)] private float angle = 2.399963f;
 
     Vector3[] boidPositions;
     Vector3[] boidVelocities;
@@ -41,8 +48,18 @@ public class Simulation : MonoBehaviour {
 
     GameObject[] boidObjects;
 
+    Vector3[] spherePoints;
+
+    readonly float GOLDEN_ANGLE = Mathf.PI * (3 - Mathf.Sqrt(5));
+
     private void OnDrawGizmos() {
         Gizmos.DrawWireCube(Vector3.zero, boxBounds);
+
+        // if (spherePoints == null) return;
+
+        // for (int i = 0; i < spherePoints.Length; i++) {
+        //     Gizmos.DrawSphere(spherePoints[i], 0.1f);
+        // }
     }
     
     private void Awake() {
@@ -51,6 +68,8 @@ public class Simulation : MonoBehaviour {
         boidAccelerations = new Vector3[boidAmount];
         boidVelocities = new Vector3[boidAmount];
         boidPositions = new Vector3[boidAmount];       
+
+        spherePoints = SpherePoints(200, boidVisionRadius, GOLDEN_ANGLE);
 
         for (uint i = 0; i < boidAmount; i++) {
             Vector3 startPosition = GetRandomPosition();
@@ -64,6 +83,8 @@ public class Simulation : MonoBehaviour {
     }
 
     private void FixedUpdate() {
+        //spherePoints = SpherePoints(numPoints, sphereRadius, angle);
+
         for (uint i = 0; i < boidAmount; i++) {
             boidAccelerations[i] = CalculateAcceleration(i);
 
@@ -71,7 +92,6 @@ public class Simulation : MonoBehaviour {
             boidVelocities[i] = SmoothVelocity(boidVelocities[i]);
 
             boidPositions[i] += boidVelocities[i] * Time.fixedDeltaTime;
-            boidPositions[i] = GetBoundCollision(boidPositions[i]);
 
             boidObjects[i].GetComponent<Boid>().UpdateBoid(boidPositions[i], boidVelocities[i]);
         }
@@ -90,7 +110,7 @@ public class Simulation : MonoBehaviour {
             Vector3 boidVector = boidPositions[boidIndex] - boidPositions[i];
             
             if (boidVector.sqrMagnitude > Math.Pow(boidVisionRadius, 2) || 
-                Math.Abs(Vector3.Angle(boidVelocities[boidIndex], -boidVector)) > boidAngle ||
+                Mathf.Abs(Vector3.Angle(boidVelocities[boidIndex], -boidVector)) > boidAngle ||
                 i == boidIndex) continue;
             
             // Calculate factors: 
@@ -106,38 +126,73 @@ public class Simulation : MonoBehaviour {
             closeBoidsAmount++;
         }
 
-        if (closeBoidsAmount == 0) return Vector3.zero;
+        Vector3 deviationAcceleration = GetBoundCollision(boidPositions[boidIndex], boidVelocities[boidIndex]) * avoidFactor;
+
+        if (closeBoidsAmount == 0) return deviationAcceleration;
 
         Vector3 centerMassDir = ((totalPosition +  boidPositions[boidIndex]) / (closeBoidsAmount + 1)) - boidPositions[boidIndex];
         Vector3 alignVelocity = ((totalVelocity + boidVelocities[boidIndex]) / (closeBoidsAmount + 1)) - boidVelocities[boidIndex];
         Vector3 awayVelocity = totalVelocityAway / closeBoidsAmount;
 
-        return awayVelocity * avoidFactor + centerMassDir.normalized * coherenceFactor + alignVelocity.normalized * alignFactor;
+        return awayVelocity * avoidFactor + centerMassDir.normalized * coherenceFactor + alignVelocity.normalized * alignFactor + deviationAcceleration;
+    }
+
+    private Vector3[] SpherePoints(uint pointsAmount, float sphereRadius, float customAngle) {
+        Vector3[] points = new Vector3[pointsAmount];
+
+        // Distance between each circle layer
+
+        for (int i = 0; i < pointsAmount; i++) {
+            // Calculate values for a sphere with radius = 1
+            
+            // Calculates z position with circle distance
+            float z = 1f - (i / (float) pointsAmount * 2f),
+                  innerCircleRadius = (float) Mathf.Sqrt(1f - Mathf.Pow(z, 2f));
+
+            float stepAngle = customAngle * i;
+
+            // Calculate x and y with step angle
+            float x = innerCircleRadius * Mathf.Cos(stepAngle),
+                  y = innerCircleRadius * Mathf.Sin(stepAngle);
+            
+            Vector3 basePoint = new(x, y, z);
+
+            // Converts the sphere to its normal size
+            points[i] = basePoint * sphereRadius;
+            
+        }
+
+        return points;
     }
 
     private Vector3 SmoothVelocity(Vector3 boidVel) {
-        if (boidVel.sqrMagnitude > Math.Pow(boidSpeed, 2)) return boidVel - inertFactor * Time.fixedDeltaTime * boidVel.normalized;
+        if (boidVel.sqrMagnitude > Mathf.Pow(boidSpeed, 2)) return boidVel - inertFactor * Time.fixedDeltaTime * boidVel.normalized;
 
         return boidVel.normalized * boidSpeed;
     }
 
-    private Vector3 GetBoundCollision(Vector3 boidPos) {        
+    private Vector3 GetBoundCollision(Vector3 boidPos, Vector3 boidVelocity) {
+        //float stepValue = 0f;
+
+        //while (!Physics.Raycast(boidPos, boidVelocity, boidVisionRadius, 6)) {
+            
+        //}
+        Vector3 boidRay = boidPos + boidVelocity.normalized * boidVisionRadius;
+
         Vector3 halfBoxBound = boxBounds / 2f;
 
-        bool xBool = boidPos.x >  halfBoxBound.x || 
-                     boidPos.x < -halfBoxBound.x;
-        bool yBool = boidPos.y >  halfBoxBound.y || 
-                     boidPos.y < -halfBoxBound.y;
-        bool zBool = boidPos.z >  halfBoxBound.z || 
-                     boidPos.z < -halfBoxBound.z;
+        bool xBool = boidRay.x >  halfBoxBound.x || 
+                     boidRay.x < -halfBoxBound.x;
+        bool yBool = boidRay.y >  halfBoxBound.y || 
+                     boidRay.y < -halfBoxBound.y;
+        bool zBool = boidRay.z >  halfBoxBound.z || 
+                     boidRay.z < -halfBoxBound.z;
 
-        Vector3 newPos = boidPos;
+        //boidVelocity.
 
-        if (xBool) newPos.x *= -.95f;
-        if (yBool) newPos.y *= -.95f;
-        if (zBool) newPos.z *= -.95f;
+        //if (xBool || yBool || zBool) return 
 
-        return newPos;
+        return Vector3.zero;
     }
     
     private Vector3 GetRandomPosition()
