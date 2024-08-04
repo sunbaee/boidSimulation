@@ -34,13 +34,12 @@ public class Simulation : MonoBehaviour {
 
     [Header("Boid Detection")]
     [SerializeField] [Range(0f, 180f)] private float boidAngle;
-    [SerializeField] private float rayCastStepAngle;
     [SerializeField] private float boidVisionRadius;
 
-    [Header("Sphere")]
-    [SerializeField] private uint numPoints;
-    [SerializeField] private float sphereRadius = 10f;
-    [SerializeField] [Range(0f, (float) Math.PI * 2)] private float angle = 2.399963f;
+    // [Header("Sphere")]
+    // [SerializeField] private uint numPoints;
+    // [SerializeField] private float sphereRadius = 10f;
+    // [SerializeField] [Range(0f, (float) Math.PI * 2)] private float angle = 2.399963f;
 
     Vector3[] boidPositions;
     Vector3[] boidVelocities;
@@ -50,11 +49,15 @@ public class Simulation : MonoBehaviour {
 
     Vector3[] spherePoints;
 
+    Vector3 showRay;
+
     readonly float GOLDEN_ANGLE = Mathf.PI * (3 - Mathf.Sqrt(5));
 
     private void OnDrawGizmos() {
         Gizmos.DrawWireCube(Vector3.zero, boxBounds);
-
+        if (boidPositions == null || boidPositions.Length == 0) return;
+        
+        Gizmos.DrawLine(boidPositions[0], showRay);
         // if (spherePoints == null) return;
 
         // for (int i = 0; i < spherePoints.Length; i++) {
@@ -126,10 +129,13 @@ public class Simulation : MonoBehaviour {
             closeBoidsAmount++;
         }
 
-        Vector3 deviationAcceleration = GetBoundCollision(boidPositions[boidIndex], boidVelocities[boidIndex]) * avoidFactor;
+        // Checks for collisions:
+        Vector3 deviationAcceleration = Mathf.Pow(avoidFactor, 3) * GetBoundCollision(boidPositions[boidIndex], boidVelocities[boidIndex]);
 
+        // If theres no nearby boids, skip other calculations.
         if (closeBoidsAmount == 0) return deviationAcceleration;
 
+        // Calculate acceleration directions:
         Vector3 centerMassDir = ((totalPosition +  boidPositions[boidIndex]) / (closeBoidsAmount + 1)) - boidPositions[boidIndex];
         Vector3 alignVelocity = ((totalVelocity + boidVelocities[boidIndex]) / (closeBoidsAmount + 1)) - boidVelocities[boidIndex];
         Vector3 awayVelocity = totalVelocityAway / closeBoidsAmount;
@@ -139,8 +145,6 @@ public class Simulation : MonoBehaviour {
 
     private Vector3[] SpherePoints(uint pointsAmount, float sphereRadius, float customAngle) {
         Vector3[] points = new Vector3[pointsAmount];
-
-        // Distance between each circle layer
 
         for (int i = 0; i < pointsAmount; i++) {
             // Calculate values for a sphere with radius = 1
@@ -166,37 +170,38 @@ public class Simulation : MonoBehaviour {
     }
 
     private Vector3 SmoothVelocity(Vector3 boidVel) {
+        // Slows velocity if its faster than the normal boid speed
         if (boidVel.sqrMagnitude > Mathf.Pow(boidSpeed, 2)) return boidVel - inertFactor * Time.fixedDeltaTime * boidVel.normalized;
 
         return boidVel.normalized * boidSpeed;
     }
 
     private Vector3 GetBoundCollision(Vector3 boidPos, Vector3 boidVelocity) {
-        //float stepValue = 0f;
+        // Adjusts ray off-set with the direction of the boid.
 
-        //while (!Physics.Raycast(boidPos, boidVelocity, boidVisionRadius, 6)) {
+        Vector3 offSetDir = boidVelocity.normalized - Vector3.forward;
+        Vector3 rayOffSet = offSetDir * boidVisionRadius;
+
+        for (int i = 0; i < spherePoints.Length; i++) {
+            // Vector from the boid to a point in the surface of a sphere.
+            Vector3 castVector = spherePoints[i] + rayOffSet;
+            showRay = boidPos + boidVelocity;
+
+            // Looks for clear direction if it collided.
+            if (Physics.Raycast(boidPos, castVector.normalized, boidVisionRadius)) continue;
             
-        //}
-        Vector3 boidRay = boidPos + boidVelocity.normalized * boidVisionRadius;
-
-        Vector3 halfBoxBound = boxBounds / 2f;
-
-        bool xBool = boidRay.x >  halfBoxBound.x || 
-                     boidRay.x < -halfBoxBound.x;
-        bool yBool = boidRay.y >  halfBoxBound.y || 
-                     boidRay.y < -halfBoxBound.y;
-        bool zBool = boidRay.z >  halfBoxBound.z || 
-                     boidRay.z < -halfBoxBound.z;
-
-        //boidVelocity.
-
-        //if (xBool || yBool || zBool) return 
+            // If a clear direction is found, creates acceleration to the clear direction.
+            if (i > 0) return (castVector - boidVelocity).normalized;
+            
+            return Vector3.zero;
+        }
 
         return Vector3.zero;
     }
     
-    private Vector3 GetRandomPosition()
-    {
+    private Vector3 GetRandomPosition() {
+        // Creates a random position inside the bound box.
+
         float xValue = Random.Range(-boxBounds.x / 2f, boxBounds.x / 2f),
               yValue = Random.Range(-boxBounds.y / 2f, boxBounds.y / 2f),
               zValue = Random.Range(-boxBounds.z / 2f, boxBounds.z / 2f);
@@ -205,6 +210,8 @@ public class Simulation : MonoBehaviour {
     }
 
     private Vector3 GetRandomDirection() {
+        // Creates a random normalized direction.
+
         float[] vecComponents = new float[3];
         for (int i = 0; i < vecComponents.Length; i++) {
             vecComponents[i] = Random.Range(-1f, 1f);
