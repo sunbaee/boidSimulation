@@ -22,13 +22,14 @@ public class DisplaySphere : MonoBehaviour {
     [Header("Sphere Configuration")]
     [SerializeField] private uint pointsAmount;
     [SerializeField] private float sphereRadius;
-    [SerializeField] private float stepAngle = SpherePoints.GOLDEN_ANGLE;
+    [SerializeField] [Range(0f, Mathf.PI * 2f)] private float stepAngle = SpherePoints.GOLDEN_ANGLE;
 
     private Vector3[] displayPoints;
 
     private void OnDrawGizmos() {
         // Show points on screen.
 
+        if (displayPoints == null) return;
         for (int i = 0; i < displayPoints.Length; i++) {
             Gizmos.DrawSphere(displayPoints[i], .1f);
         }
