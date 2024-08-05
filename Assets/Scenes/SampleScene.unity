@@ -456,12 +456,12 @@ MonoBehaviour:
   boxBounds: {x: 25, y: 20, z: 20}
   boxThickness: 0.5
   boidAmount: 200
-  boidSpeed: 6
+  boidSpeed: 8
   coherenceFactor: 4.5
   avoidFactor: 4.5
   alignFactor: 3
   inertFactor: 0.25
-  collisionDeviation: 16
+  collisionDeviation: 32
   boidAngle: 120
   boidVisionRadius: 5
 --- !u!4 &2074367059

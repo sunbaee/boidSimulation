@@ -58,9 +58,6 @@ public class Simulation : MonoBehaviour {
     // points in a sphere surface.
     Vector3[] spherePoints;
 
-    // Golden angle to create uniform points in a sphere surface.
-    readonly float GOLDEN_ANGLE = Mathf.PI * (3 - Mathf.Sqrt(5));
-
     private void OnDrawGizmos() {
         Gizmos.color = new Color(.45f, .45f, 1f);
         Gizmos.DrawWireCube(Vector3.zero, boxBounds);
@@ -74,7 +71,9 @@ public class Simulation : MonoBehaviour {
         boidPositions = new Vector3[boidAmount];       
 
         boxThicknessVector = new(boxThickness, boxThickness, boxThickness);
-        spherePoints = SpherePoints(100, boidVisionRadius, GOLDEN_ANGLE);
+        
+        SpherePoints sphereObj = new(100, boidVisionRadius, SpherePoints.GOLDEN_ANGLE);
+        spherePoints = sphereObj.GetPoints;
 
         for (uint i = 0; i < boidAmount; i++) {
             Vector3 startPosition = GetRandomPosition(boxBounds - boxThicknessVector);
@@ -143,31 +142,6 @@ public class Simulation : MonoBehaviour {
         Vector3 awayVelocity = totalVelocityAway / closeBoidsAmount;
 
         return awayVelocity * avoidFactor + centerMassDir.normalized * coherenceFactor + alignVelocity.normalized * alignFactor + deviationAcceleration;
-    }
-
-    private Vector3[] SpherePoints(uint pointsAmount, float sphereRadius, float customAngle) {
-        Vector3[] points = new Vector3[pointsAmount];
-
-        for (int i = 0; i < pointsAmount; i++) {
-            // Calculate values for a sphere with radius = 1
-            
-            // Calculates z position with circle distance
-            float z = 1f - (i / (float) pointsAmount * 2f),
-                  innerCircleRadius = (float) Mathf.Sqrt(1f - Mathf.Pow(z, 2f));
-
-            float stepAngle = customAngle * i;
-
-            // Calculate x and y with step angle
-            float x = innerCircleRadius * Mathf.Cos(stepAngle),
-                  y = innerCircleRadius * Mathf.Sin(stepAngle);
-            
-            Vector3 basePoint = new(x, y, z);
-
-            // Converts the sphere to its normal size
-            points[i] = basePoint * sphereRadius;
-        }
-
-        return points;
     }
 
     private Vector3 SmoothVelocity(Vector3 boidVel) {
