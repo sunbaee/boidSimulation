@@ -33,12 +33,16 @@ public class Simulation : MonoBehaviour {
     [SerializeField] private float coherenceFactor;
     [SerializeField] private float avoidFactor;
     [SerializeField] private float alignFactor;
+    [SerializeField] private float collideFactor;
     [SerializeField] private float inertFactor;
-    [SerializeField] private float collisionDeviation;
 
     [Header("Boid Detection")]
     [SerializeField] [Range(0f, 180f)] private float boidAngle;
     [SerializeField] private float boidVisionRadius;
+
+    [Header("Boid Predators")]
+    [SerializeField] private uint predatorsAmount;
+    [SerializeField] private float escapeFactor;
 
     // [Header("Sphere")]
     // [SerializeField] private uint numPoints;
@@ -46,6 +50,9 @@ public class Simulation : MonoBehaviour {
     // [SerializeField] [Range(0f, (float) Math.PI * 2)] private float angle = 2.399963f;
 
     GameObject[] boidObjects;
+
+    // Predator boids Indexes
+    uint[] predatorsIndexes;
 
     // boid vectors.
     Vector3[] boidPositions;
@@ -75,23 +82,29 @@ public class Simulation : MonoBehaviour {
         SpherePoints sphereObj = new(100, boidVisionRadius, SpherePoints.GOLDEN_ANGLE);
         spherePoints = sphereObj.GetPoints;
 
-        for (uint i = 0; i < boidAmount; i++) {
-            Vector3 startPosition = GetRandomPosition(boxBounds - boxThicknessVector);
+        predatorsIndexes = new uint[predatorsAmount];
+        for (uint i = 0; i < predatorsAmount; i++) predatorsIndexes[i] = (uint) Random.Range(0, boidAmount - 1);
 
-            boidObjects[i] = Instantiate(boidObject, startPosition, Quaternion.identity);
+        for (uint i = 0; i < boidAmount; i++) {    
             boidVelocities[i] = GetRandomDirection() * boidSpeed;
-            boidPositions[i] = startPosition;
+            boidPositions[i] = GetRandomPosition(boxBounds - boxThicknessVector);
 
-            PaintBoid(i, new Color(.4f, .4f, 1f));
+            boidObjects[i] = Instantiate(boidObject, boidPositions[i], Quaternion.identity);
+
+            Boid currentBoid = boidObjects[i].GetComponent<Boid>();
+
+            if (predatorsIndexes.Contains(i)) currentBoid.Initialize(coherenceFactor, 0, 0, collideFactor, new Color(1f, 0f, 0f));
+            else currentBoid.Initialize(coherenceFactor, alignFactor, avoidFactor, collideFactor, new Color(.4f, .4f, 1f));
+            
+            currentBoid.UpdateBoid(boidPositions[i], boidVelocities[i]);
         }
     }
 
     private void FixedUpdate() {
-        //spherePoints = SpherePoints(numPoints, sphereRadius, angle);
-
         for (uint i = 0; i < boidAmount; i++) {
             boidAccelerations[i] = CalculateAcceleration(i);
 
+            // Updates velocities with time
             boidVelocities[i] += boidAccelerations[i] * Time.fixedDeltaTime;
             boidVelocities[i] = SmoothVelocity(boidVelocities[i]);
 
@@ -121,27 +134,22 @@ public class Simulation : MonoBehaviour {
             // Coherence - Boid fly towards other boids.
             // Alignment - Boid tries to match its speed and direction with nearby boids.
             // Separation - Boid avoid running into other.
-
+            
             totalPosition += boidPositions[i];
             totalVelocity += boidVelocities[i];
-
+            
             totalVelocityAway += boidVector.normalized * (boidVector.magnitude > 0 ? (boidVisionRadius / boidVector.magnitude) : avoidFactor * boidSpeed);
+
+            if (predatorsIndexes.Contains(i)) totalVelocityAway *= escapeFactor;
 
             closeBoidsAmount++;
         }
 
-        // Checks for collisions:
-        Vector3 deviationAcceleration = collisionDeviation * GetCollisions(boidPositions[boidIndex], boidVelocities[boidIndex]);
+        Vector3 dodgeDirection = GetCollisions(boidPositions[boidIndex], boidVelocities[boidIndex]);
+        Vector3[] addedVectors = { totalPosition, totalVelocity, totalVelocityAway };
 
-        // If theres no nearby boids, skip other calculations.
-        if (closeBoidsAmount == 0) return deviationAcceleration;
-
-        // Calculate acceleration directions:
-        Vector3 centerMassDir = ((totalPosition +  boidPositions[boidIndex]) / (closeBoidsAmount + 1)) - boidPositions[boidIndex];
-        Vector3 alignVelocity = ((totalVelocity + boidVelocities[boidIndex]) / (closeBoidsAmount + 1)) - boidVelocities[boidIndex];
-        Vector3 awayVelocity = totalVelocityAway / closeBoidsAmount;
-
-        return awayVelocity * avoidFactor + centerMassDir.normalized * coherenceFactor + alignVelocity.normalized * alignFactor + deviationAcceleration;
+        Boid currentBoid = boidObjects[boidIndex].GetComponent<Boid>();
+        return currentBoid.BoidAcceleration(addedVectors, dodgeDirection, closeBoidsAmount);
     }
 
     private Vector3 SmoothVelocity(Vector3 boidVel) {
@@ -211,9 +219,5 @@ public class Simulation : MonoBehaviour {
         }
 
         return new Vector3(vecComponents[0], vecComponents[1], vecComponents[2]).normalized;
-    }
-
-    private void PaintBoid(uint boidIndex, Color color) {
-        boidObjects[boidIndex].GetComponent<Renderer>().material.SetColor("_BaseColor", color);
     }
 }
