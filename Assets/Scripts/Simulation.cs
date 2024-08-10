@@ -34,6 +34,7 @@ public class Simulation : MonoBehaviour {
     [SerializeField] private float avoidFactor;
     [SerializeField] private float alignFactor;
     [SerializeField] private float collideFactor;
+    [SerializeField] private float randomFactor;
     [SerializeField] private float inertFactor;
 
     [Header("Boid Detection")]
@@ -65,12 +66,16 @@ public class Simulation : MonoBehaviour {
     // points in a sphere surface.
     Vector3[] spherePoints;
 
+    // Switch between random flock vectors.
+    bool isSleeping;
+
     private void OnDrawGizmos() {
         Gizmos.color = new Color(.45f, .45f, 1f);
         Gizmos.DrawWireCube(Vector3.zero, boxBounds);
     }
     
     private void Awake() {
+        StartCoroutine(StartTimer(3f));
         boidObjects = new GameObject[boidAmount];
 
         boidAccelerations = new Vector3[boidAmount];
@@ -102,6 +107,7 @@ public class Simulation : MonoBehaviour {
 
     private void FixedUpdate() {
         for (uint i = 0; i < boidAmount; i++) {
+            
             boidAccelerations[i] = CalculateAcceleration(i);
 
             // Updates velocities with time
@@ -112,7 +118,7 @@ public class Simulation : MonoBehaviour {
 
             boidObjects[i].GetComponent<Boid>().UpdateBoid(boidPositions[i], boidVelocities[i]);
         }
-    }
+    }   
 
     private Vector3 CalculateAcceleration(uint boidIndex) {
         Vector3 totalVelocityAway = Vector3.zero;
@@ -120,7 +126,7 @@ public class Simulation : MonoBehaviour {
         Vector3 totalPosition = Vector3.zero;
 
         uint closeBoidsAmount = 0;
-
+        
         for (uint i = 0; i < boidAmount; i++) {
             
             // Check distance from another boids and calculate factors if the distance is less than the boid vision radius.
@@ -145,11 +151,29 @@ public class Simulation : MonoBehaviour {
             closeBoidsAmount++;
         }
 
-        Vector3 dodgeDirection = GetCollisions(boidPositions[boidIndex], boidVelocities[boidIndex]);
         Vector3[] addedVectors = { totalPosition, totalVelocity, totalVelocityAway };
+        
+        Vector3 dodgeDirection = GetCollisions(boidPositions[boidIndex], boidVelocities[boidIndex]);
 
+        Vector3 randomDir = RandomizeDirection();
+        Vector3 randomAcc = randomDir != Vector3.zero ? (randomDir - boidVelocities[boidIndex].normalized) * randomFactor : Vector3.zero;
+        
         Boid currentBoid = boidObjects[boidIndex].GetComponent<Boid>();
-        return currentBoid.BoidAcceleration(addedVectors, dodgeDirection, closeBoidsAmount);
+        return currentBoid.BoidAcceleration(addedVectors, dodgeDirection, randomAcc, closeBoidsAmount);
+    }
+    
+    private Vector3 RandomizeDirection() {
+        if (isSleeping) return Vector3.zero;
+        return GetRandomDirection();
+    }
+
+    private IEnumerator StartTimer(float seconds) {
+        while (true) {
+            isSleeping = false;
+            yield return new WaitForFixedUpdate();
+            isSleeping = true;
+            yield return new WaitForSeconds(seconds);
+        }
     }
 
     private Vector3 SmoothVelocity(Vector3 boidVel) {
@@ -213,11 +237,8 @@ public class Simulation : MonoBehaviour {
     private Vector3 GetRandomDirection() {
         // Creates a random normalized direction.
 
-        float[] vecComponents = new float[3];
-        for (int i = 0; i < vecComponents.Length; i++) {
-            vecComponents[i] = Random.Range(-1f, 1f);
-        }
+        int pointIndex = Random.Range(0, spherePoints.Length - 1);
 
-        return new Vector3(vecComponents[0], vecComponents[1], vecComponents[2]).normalized;
+        return spherePoints[pointIndex].normalized;
     }
 }

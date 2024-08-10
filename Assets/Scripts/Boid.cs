@@ -16,6 +16,8 @@ public class Boid : MonoBehaviour {
     private Vector3 position;
     private Vector3 velocity;
 
+    private Vector3 boidRandomDir;
+
     public void Initialize(float coherenceFactor, float alignFactor, float avoidFactor, float collideFactor, Color boidColor) {
         this.coherenceFactor = coherenceFactor;
         this.alignFactor = alignFactor;
@@ -36,12 +38,14 @@ public class Boid : MonoBehaviour {
         transform.LookAt(position + velocity);
     }
 
-    public Vector3 BoidAcceleration(Vector3[] addedVectors, Vector3 dodgeDir, uint closeBoidsAmount) {
+    public Vector3 BoidAcceleration(Vector3[] addedVectors, Vector3 dodgeDir, Vector3 randomDir, uint closeBoidsAmount) {
         // Checks for collisions:
         Vector3 dodgeAcc = collideFactor * dodgeDir;
 
+        if (randomDir != Vector3.zero) boidRandomDir = randomDir;
+
         // If theres no nearby boids, skip other calculations.
-        if (closeBoidsAmount == 0) return dodgeAcc;
+        if (closeBoidsAmount == 0) return dodgeAcc + boidRandomDir;
 
         // Calculate acceleration directions:
         Vector3 centerMassDir = (((addedVectors[0] + position) / (closeBoidsAmount + 1)) - position).normalized * coherenceFactor;
@@ -49,7 +53,7 @@ public class Boid : MonoBehaviour {
 
         Vector3 awayVelocity = addedVectors[2] / closeBoidsAmount * avoidFactor;
         
-        return awayVelocity + centerMassDir + alignVelocity + dodgeAcc;
+        return awayVelocity + centerMassDir + alignVelocity + dodgeAcc + boidRandomDir;
     }
 
     private void PaintBoid(Color color) {
